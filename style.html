@@ -5171,65 +5171,104 @@ button:disabled {
   border-radius: 25px;
 }
 
+
+
+
+
+
+
+
+
+
+.package-btn.icon-btn i {
+  pointer-events: none;
+}
+
+.package-btn.icon-btn:hover {
+  background: #f9fafb;
+}
+
+.package-btn.icon-btn {
+  color: #374151;
+}
+.package-btn.icon-btn:hover {
+  color: #111827;
+}
+
+/* ================= FINAL CARD COMPACTION FIX ================= */
+
+/* 1. Stop cards from stretching */
+.retention-card {
+  height: auto !important;
+  padding: 14px !important;
+}
+
+/* 2. Remove forced minimum heights */
+.retention-card-header {
+  min-height: unset !important;
+  margin-bottom: 10px;
+}
+
+.retention-progress {
+  min-height: unset !important;
+  margin-bottom: 10px;
+}
+
+/* 3. Stop pushing actions artificially */
+.retention-actions {
+  margin-top: 10px !important;
+}
+
+/* 4. Tighten header text */
+.retention-name {
+  font-size: 14px;
+  line-height: 1.15;
+}
+
+.retention-company {
+  font-size: 11.5px;
+  margin-top: 2px;
+}
+
+/* 5. Slim progress bar area */
+.progress-label {
+  font-size: 11px;
+}
+
+.progress-bar {
+  height: 5px;
+}
+
+/* 6. Slim buttons */
+.complete-btn {
+  height: 32px;
+  font-size: 12px;
+}
+
+.danger-btn {
+  width: 32px;
+  height: 32px;
+}
+
+/* 7. Ensure grid does not add vertical space */
+.retention-grid {
+  align-content: start;
+}
+
+/* ================= Hover Highlight ================= */
+
+.retention-card {
+  transition: box-shadow 0.25s ease, border-color 0.25s ease;
+}
+
+.retention-card:hover {
+  border-color: #22c55e; /* green border */
+  box-shadow:
+    0 0 0 3px rgba(34, 197, 94, 0.18),
+    0 10px 26px rgba(34, 197, 94, 0.25);
+}
+
 </style>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 

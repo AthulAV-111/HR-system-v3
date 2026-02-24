@@ -6015,10 +6015,12 @@ function buildRetentionSection(title, list) {
   // optional collapse behavior (can keep for later)
   const header = section.querySelector(".section-header");
   const body = section.querySelector(".section-body");
+  const icon = header.querySelector("i");
 
-  // header.addEventListener("click", () => {
-  //   body.classList.toggle("hidden");
-  // });
+  header.addEventListener("click", () => {
+    body.classList.toggle("hidden");
+    icon.classList.toggle("rotated");
+  });
 
   return section;
 }
@@ -6026,12 +6028,24 @@ function buildRetentionSection(title, list) {
 //Retention card generator
 
 function createRetentionCard(item) {
+   // ===== STEP 2: Progress calculation =====
+  const totalDays = Number(item.retentionTimeFrame) || 0;
+  const doneDays = Math.min(item.completedDays || 0, totalDays);
+
+  const progressPercent = totalDays
+    ? Math.round((doneDays / totalDays) * 100)
+    : 0;
+
   const status = (item.status || "").toLowerCase();
-  const isCompleted = status === "completed";
-  const isExited = status === "resignation" || status === "termination";
+  const isCompleted =
+    status === "completed" ||
+    (doneDays >= totalDays && totalDays > 0);
+
+  const isExited =
+    status === "resignation" || status === "termination";
 
   return `
-    <div class="retention-card">
+    <div class="retention-card ${isCompleted ? 'is-completed' : ''}">
 
       <!-- HEADER -->
       <div class="retention-card-header">
@@ -6045,42 +6059,67 @@ function createRetentionCard(item) {
           </div>
         </div>
 
-        <button class="package-btn"
+        <button class="package-btn icon-btn"
+          title="Package Details"
           data-salary="${item.salary || ""}"
           data-joining="${item.joiningDate || ""}">
-          Package Details
+          <i class="fa-solid fa-file-signature"></i>
         </button>
+          <div class="package-popover hidden">
+            <div class="package-popover-content">
+              <div class="pkg-label">Job Salary</div>
+              <div class="pkg-value">${item.salary || "—"}</div>
+
+              <div class="pkg-label">Joining Date</div>
+              <div class="pkg-value">
+                ${item.joiningDate
+                  ? new Date(item.joiningDate).toLocaleDateString("en-GB")
+                  : "—"}
+              </div>
+            </div>
+          </div>
       </div>
 
       <!-- PROGRESS -->
       <div class="retention-progress">
         <div class="progress-label">
-          Retention Period
-          ${
-            isCompleted
-              ? `<span class="status-text completed">Completed</span>`
-              : isExited
-                ? `<span class="status-text exited">${item.status}</span>`
-                : ""
-          }
+          <span>Retention Period</span>
+          <span class="status-text ${isCompleted ? 'completed' : ''}">
+            ${isCompleted ? 'Completed' : `${doneDays}/${totalDays}`}
+          </span>
         </div>
 
-        <div class="progress-bar">
-          <div class="progress-fill ${isCompleted ? "completed" : ""}"></div>
+       <div class="progress-bar">
+          <div
+            class="progress-fill ${isCompleted ? 'completed' : ''}"
+            style="width: ${isCompleted ? 100 : progressPercent}%">
+          </div>
         </div>
       </div>
 
-      <!-- ACTIONS -->
+     <!-- ACTIONS -->
       <div class="retention-actions">
-        <button class="danger-btn" title="Resign / Terminate">
-          <i class="fa-solid fa-user-slash"></i>
+
+        <button 
+          class="danger-btn retention-exit-btn ${isCompleted ? 'disabled' : ''}"
+          data-employee-id="${item.employeeId}"
+          data-profile-id="${item.profileId}"
+          data-company="${item.companyName}"
+          ${isCompleted ? 'disabled' : ''}
+        >
+          <i class="fa-solid fa-arrow-right-from-bracket"></i>
         </button>
 
-        <button class="complete-btn ${isCompleted ? "active" : "disabled"}">
+        <button
+          class="complete-btn ${isCompleted ? 'active' : item.canComplete ? 'active' : 'disabled'}"
+          data-employee-id="${item.employeeId}"
+          data-profile-id="${item.profileId}"
+          ${isCompleted || item.canComplete ? '' : 'disabled'}
+        >
           Completed
         </button>
-      </div>
 
+      </div>
     </div>
   `;
 }
@@ -6112,11 +6151,199 @@ document.addEventListener("click", function (e) {
 });
 
 
-//==========================================================
+// ================= Retention Complete Handler =================
+document.addEventListener("click", function (e) {
+  const btn = e.target.closest(".complete-btn");
+  if (!btn) return;
 
+  // Block disabled buttons
+  if (btn.hasAttribute("disabled")) return;
+
+  const employeeId = btn.dataset.employeeId;
+  const profileId  = btn.dataset.profileId;
+
+  if (!employeeId || !profileId) {
+    console.error("Missing identifiers for retention completion");
+    return;
+  }
+
+  //  Reuse your existing confirmation modal
+  openConfirmationModal(
+    "Mark Retention as Completed",
+  `
+    Are you sure you want to mark this retention as
+    <br><strong>Completed</strong>?
+  `,
+    () => {
+      btn.textContent = "Updating...";
+      btn.setAttribute("disabled", true);
+
+      google.script.run
+        .withSuccessHandler(() => {
+          showSuccessNotification("Retention marked as Completed");
+          loadRetentionPool(); // refresh UI
+        })
+        .withFailureHandler(err => {
+          console.error(err);
+          showErrorNotification("Failed to update retention");
+          btn.textContent = "Completed";
+          btn.removeAttribute("disabled");
+        })
+        .markRetentionCompleted(employeeId, profileId);
+    }
+  );
+});
+
+//Click handler for Leave button
+document.addEventListener("click", function (e) {
+  const btn = e.target.closest(".retention-exit-btn");
+  if (!btn) return;
+
+  closeAllExitModals(); // 🔥 important
+
+  exitContext.employeeId = btn.dataset.employeeId;
+  exitContext.profileId  = btn.dataset.profileId;
+  exitContext.company    = btn.dataset.company;
+
+  document.getElementById("exitCauseModal").classList.add("active");
+});
+
+
+// <!-- Handle Exit Cause selection -->
+function selectExitCause(type) {
+  closeAllExitModals();
+
+  exitContext.type = type;
+
+  const title =
+    type === "resignation"
+      ? "Please Specify the Reason for Candidate Resignation"
+      : "Please Specify the Reason for Company Termination";
+
+  document.getElementById("exitDetailsTitle").innerText = title;
+
+  const select = document.getElementById("exitReasonSelect");
+  select.innerHTML = `<option value="">Loading reasons...</option>`;
+
+  google.script.run
+    .withSuccessHandler(reasons => {
+      select.innerHTML = `<option value="">Select reason</option>`;
+
+      if (!reasons.length) {
+        const opt = document.createElement("option");
+        opt.value = "";
+        opt.textContent = "No reasons found";
+        select.appendChild(opt);
+        return;
+      }
+
+      reasons.forEach(r => {
+        const opt = document.createElement("option");
+        opt.value = r;
+        opt.textContent = r;
+        select.appendChild(opt);
+      });
+    })
+    .withFailureHandler(err => {
+      console.error(err);
+      select.innerHTML = `<option value="">Failed to load reasons</option>`;
+    })
+    .getExitReasons(type);
+
+  document.getElementById("exitDetailsModal").classList.add("active");
+}
+
+
+//Open Final Confirmation
+function openFinalExitConfirm() {
+  const reason = document.getElementById("exitReasonSelect").value;
+  const date   = document.getElementById("exitLastWorkingDate").value;
+
+  if (!reason || !date) {
+    alert("Please fill all details");
+    return;
+  }
+
+  exitContext.reason = reason;
+  exitContext.lastDate = date;
+
+  closeAllExitModals(); // 🔥 hide reason modal
+
+  document.getElementById("exitFinalText").innerHTML = `
+    Are you sure to update retention status as
+    <br><strong>${
+      exitContext.type === "resignation"
+        ? "Candidate Resignation"
+        : "Company Termination"
+    }</strong>
+  `;
+
+  document.getElementById("exitFinalConfirmModal").classList.add("active");
+}
+
+
+//Final Confirm
+function confirmExit() {
+  google.script.run
+    .withSuccessHandler(() => {
+      showSuccessNotification("Retention updated successfully");
+      closeAllExitModals();
+      loadRetentionPool();
+    })
+    .withFailureHandler(err => {
+      console.error(err);
+      showErrorModal("Failed to update retention");
+    })
+    .markRetentionExit(
+      exitContext.employeeId,
+      exitContext.profileId,
+      exitContext.company,
+      exitContext.type,
+      exitContext.reason,
+      exitContext.lastDate
+    );
+}
+
+//Close helpers
+function closeExitDetails() {
+  closeAllExitModals();
+}
+
+function closeFinalExit() {
+  closeAllExitModals();
+}
+
+function closeAllExitModals() {
+  document.getElementById("exitCauseModal")?.classList.remove("active");
+  document.getElementById("exitDetailsModal")?.classList.remove("active");
+  document.getElementById("exitFinalConfirmModal")?.classList.remove("active");
+}
+
+let activePackageButton = null;
+document.addEventListener("click", function (e) {
+  const btn = e.target.closest(".package-btn");
+  if (!btn) return;
+
+  const card = btn.closest(".retention-card");
+  const popover = card.querySelector(".package-popover");
+
+  // Close all other popovers
+  document
+    .querySelectorAll(".package-popover")
+    .forEach(p => {
+      if (p !== popover) p.classList.add("hidden");
+    });
+
+  popover.classList.toggle("hidden");
+});
+
+
+//==========================================================
 
 
 </script>
 </body>
 
 </html>
+
+
