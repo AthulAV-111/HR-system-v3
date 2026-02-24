@@ -1539,7 +1539,7 @@ function markRetentionExit(
 
   let companyWithJob = ""; // ✅ DECLARED ONCE
 
-  /* ================= Retention Pool ================= */
+  /* ================= Retention Pool ================-= */
   const retentionData = retentionSheet.getDataRange().getValues();
 
   for (let i = 1; i < retentionData.length; i++) {
